@@ -41,6 +41,7 @@ import com.codename1.ui.events.StyleListener;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.Resources;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -58,6 +59,85 @@ import java.util.HashMap;
  * @author Chen Fishbein
  */
 public class Component implements Animation, StyleListener {
+    
+    /**
+     * Indicates whether the component displays the material design ripple effect
+     */
+    private boolean rippleEffect;    
+    
+    /**
+     * The default cursor
+     */
+    public static final int DEFAULT_CURSOR = 0;
+
+    /**
+     * The crosshair cursor type.
+     */
+    public static final int CROSSHAIR_CURSOR = 1;
+
+    /**
+     * The text cursor type.
+     */
+    public static final int TEXT_CURSOR = 2;
+
+    /**
+     * The wait cursor type.
+     */
+    public static final int WAIT_CURSOR = 3;
+
+    /**
+     * The south-west-resize cursor type.
+     */
+    public static final int SW_RESIZE_CURSOR = 4;
+
+    /**
+     * The south-east-resize cursor type.
+     */
+    public static final int SE_RESIZE_CURSOR = 5;
+
+    /**
+     * The north-west-resize cursor type.
+     */
+    public static final int NW_RESIZE_CURSOR = 6;
+
+    /**
+     * The north-east-resize cursor type.
+     */
+    public static final int NE_RESIZE_CURSOR = 7;
+
+    /**
+     * The north-resize cursor type.
+     */
+    public static final int N_RESIZE_CURSOR = 8;
+
+    /**
+     * The south-resize cursor type.
+     */
+    public static final int S_RESIZE_CURSOR = 9;
+
+    /**
+     * The west-resize cursor type.
+     */
+    public static final int W_RESIZE_CURSOR = 10;
+
+    /**
+     * The east-resize cursor type.
+     */
+    public static final int E_RESIZE_CURSOR = 11;
+
+    /**
+     * The hand cursor type.
+     */
+    public static final int HAND_CURSOR = 12;
+
+    /**
+     * The move cursor type.
+     */
+    public static final int MOVE_CURSOR = 13;
+    
+    private int cursor;
+
+
     /**
      * Used by getDragRegionStatus to indicate no dragability
      */
@@ -92,6 +172,21 @@ public class Component implements Animation, StyleListener {
      * Used by getDragRegionStatus to indicate likely dragability
      */
     public static final int DRAG_REGION_LIKELY_DRAG_XY = 23;
+    
+    /**
+     * Used by getDragRegionStatus to indicate immediate dragability
+     */
+    public static final int DRAG_REGION_IMMEDIATELY_DRAG_X = 31;
+    
+    /**
+     * Used by getDragRegionStatus to indicate immediate dragability
+     */
+    public static final int DRAG_REGION_IMMEDIATELY_DRAG_Y = 32;
+    
+    /**
+     * Used by getDragRegionStatus to indicate immediate dragability
+     */
+    public static final int DRAG_REGION_IMMEDIATELY_DRAG_XY = 33;
     
     private String selectText;
     private boolean alwaysTensile;
@@ -208,6 +303,7 @@ public class Component implements Animation, StyleListener {
 
     private boolean hideInPortrait;
     private int scrollOpacity = 0xff;
+    private boolean ignorePointerEvents;
             
     /**
      * Indicates the decrement units for the scroll opacity
@@ -229,6 +325,10 @@ public class Component implements Animation, StyleListener {
     private Motion animationMotion;
     Motion draggedMotionX;
     Motion draggedMotionY;
+    
+    // Reference that is only filled when a drag motion is a decelration motion
+    // for tensile scrolling
+    private Motion decelerationMotion;
 
     /**
      * Allows us to flag a drag operation in action thus preventing the mouse pointer
@@ -279,6 +379,13 @@ public class Component implements Animation, StyleListener {
     private final Object dirtyRegionLock = new Object();
     private Label componentLabel;
     private String id;
+    
+    private Resources inlineStylesTheme;
+    private String inlineAllStyles;
+    private String inlinePressedStyles;
+    private String inlineDisabledStyles;
+    private String inlineSelectedStyles;
+    private String inlineUnselectedStyles;
 
     /**
      * Is the component a bidi RTL component
@@ -319,6 +426,38 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
+     * Sets a custom mouse cursor for this component if the platform supports mouse cursors, notice that this isn't applicable for touch devices.  
+     * This will only be used if the platform supports custom cursors.  
+     * You can call {@link #isSetCursorSupported() } to find out.
+     * 
+     * <p><strong>Note:</strong> Since cursors incur some overhead, they are turned off at the form level by default.
+     * If you want your custom cursors to be used, then you'll need to enable cursors in the form using {@link Form#setEnableCursors(boolean) }.</p>
+     * @param cursor The cursor to set on this component.  One of {@link #DEFAULT_CURSOR}, {@link #CROSSHAIR_CURSOR}, {@link #TEXT_CURSOR},
+     * {@link #WAIT_CURSOR}, {@link #SW_RESIZE_CURSOR}, {@link #SE_RESIZE_CURSOR}, {@link #S_RESIZE_CURSOR}, {@link #NE_RESIZE_CURSOR},
+     * {@link #NW_RESIZE_CURSOR}, {@link #W_RESIZE_CURSOR}, {@link #HAND_CURSOR}, or {@link #MOVE_CURSOR}.
+     * 
+     * @see Form#setEnableCursors(boolean) 
+     * @see Form#isEnableCursors() 
+     * 
+     */
+    public void setCursor(int cursor) {
+        this.cursor = cursor;
+    }
+    
+    /**
+     * Gets the custom cursor for this component.  This will only be used if the platform supports custom cursors.  
+     * You can call {@link #isSetCursorSupported() } to find out.
+     * @return The cursor to set on this component.  One of {@link #DEFAULT_CURSOR}, {@link #CROSSHAIR_CURSOR}, {@link #TEXT_CURSOR},
+     * {@link #WAIT_CURSOR}, {@link #SW_RESIZE_CURSOR}, {@link #SE_RESIZE_CURSOR}, {@link #S_RESIZE_CURSOR}, {@link #NE_RESIZE_CURSOR},
+     * {@link #NW_RESIZE_CURSOR}, {@link #W_RESIZE_CURSOR}, {@link #HAND_CURSOR}, or {@link #MOVE_CURSOR}.
+     * 
+     * 
+     */
+    public int getCursor() {
+        return this.cursor;
+    }
+    
+    /**
      * This is identical to invoking {@link #sameWidth} followed by {@link #sameHeight}
      * 
      * @param c the components to group together, this will override all previous width/height grouping
@@ -356,6 +495,15 @@ public class Component implements Animation, StyleListener {
                 cc.sameWidth = c;
             }
         }
+    }
+    
+    /**
+     * Checks to see if this platform supports cursors.  If the platform doesn't support cursors then any cursors
+     * set with {@link #setCursor(int) } will simply be ignored.
+     * @return True if the platform supports custom cursors.
+     */
+    public static boolean isSetCursorSupported() {
+        return Display.getInstance().getImplementation().isSetCursorSupported();
     }
     
     /**
@@ -454,8 +602,159 @@ public class Component implements Animation, StyleListener {
         }        
     }
 
+    /**
+     * Gets the UIID that would be used for this component if inline styles are used.
+     * Generally this UIID follows the format: {@literal id[name]} where "id" is the UIID of
+     * the component, and "name" is the name of the component. 
+     * @return 
+     */
+    private String getInlineStylesUIID() {
+        return getUIID()+"["+getName()+"]";
+    }
+    
+    /**
+     * Gets the UIID that would be used for this component if inline styles are used.
+     * Generally this UIID follows the format: {@literal id[name]} where "id" is the UIID of
+     * the component, and "name" is the name of the component. 
+     * @param id UIID to use as the base.
+     * @return 
+     * @see #getInlineStylesUIID() 
+     */
+    private String getInlineStylesUIID(String id) {
+        return id +"["+getName()+"]";
+    }
+    
+    /**
+     * Checks to see if the component has any inline styles registered for its unselected state.
+     * @return True if the component has inline styles registered for the unselected state.  
+     */
+    private boolean hasInlineUnselectedStyle() {
+        return getInlineStylesTheme() != null && (inlineAllStyles != null || inlineUnselectedStyles != null);
+    }
+    
+    /**
+     * Checks to see if the component has any inline styles registered for its pressed state.
+     * @return True if the component has inline styles registered for the pressed state.  
+     */
+    private boolean hasInlinePressedStyle() {
+        return getInlineStylesTheme() != null && (inlineAllStyles != null || inlinePressedStyles != null);
+    }
+    
+    /**
+     * Checks to see if the component has any inline styles registered for its disabled state.
+     * @return True if the component has inline styles registered for the disabled state.  
+     */
+    private boolean hasInlineDisabledStyle() {
+        return getInlineStylesTheme() != null && (inlineAllStyles != null || inlineDisabledStyles != null);
+    }
+    
+    /**
+     * Checks to see if the component has any inline styles registered for its selected state.
+     * @return True if the component has inline styles registered for the selected state.  
+     */
+    private boolean hasInlineSelectedStyle() {
+        return getInlineStylesTheme() != null && (inlineAllStyles != null || inlineSelectedStyles != null);
+    }
+    
+    /**
+     * Gets array of style strings to be used for inline unselected style. This may include
+     * the {@link #inlineAllStyles} string and/or the {@link #inlineUnselectedStyles} string.
+     * @return Array of inline style strings to be applied to pressed state.  Or null if
+     * none specified.
+     */
+    private String[] getInlineUnselectedStyleStrings() {
+        if (inlineAllStyles != null) {
+            if (inlineUnselectedStyles != null) {
+                return new String[] {inlineAllStyles, inlineUnselectedStyles};
+            } else {
+                return new String[] {inlineAllStyles};
+            }
+        } else {
+            if (inlineUnselectedStyles != null) {
+                return new String[]{inlineUnselectedStyles};
+            } else {
+                return null;
+            }
+                    
+        }
+    }
+    
+    /**
+     * Gets array of style strings to be used for inline selected style. This may include
+     * the {@link #inlineAllStyles} string and/or the {@link #inlineSelectedStyles} string.
+     * @return Array of inline style strings to be applied to pressed state.  Or null if
+     * none specified.
+     */
+    private String[] getInlineSelectedStyleStrings() {
+        if (inlineAllStyles != null) {
+            if (inlineSelectedStyles != null) {
+                return new String[] {inlineAllStyles, inlineSelectedStyles};
+            } else {
+                return new String[] {inlineAllStyles};
+            }
+        } else {
+            if (inlineSelectedStyles != null) {
+                return new String[]{inlineSelectedStyles};
+            } else {
+                return null;
+            }
+                    
+        }
+    }
+    
+    /**
+     * Gets array of style strings to be used for inline pressed style. This may include
+     * the {@link #inlineAllStyles} string and/or the {@link #inlinePressedStyles} string.
+     * @return Array of inline style strings to be applied to pressed state.  Or null if
+     * none specified.
+     */
+    private String[] getInlinePressedStyleStrings() {
+        if (inlineAllStyles != null) {
+            if (inlinePressedStyles != null) {
+                return new String[] {inlineAllStyles, inlinePressedStyles};
+            } else {
+                return new String[] {inlineAllStyles};
+            }
+        } else {
+            if (inlinePressedStyles != null) {
+                return new String[]{inlinePressedStyles};
+            } else {
+                return null;
+            }
+                    
+        }
+    }
+    
+    /**
+     * Gets array of style strings to be used for inline disabled style. This may include
+     * the {@link #inlineAllStyles} string and/or the {@link #inlineDisabledStyles} string.
+     * @return Array of inline style strings to be applied to disabled state.  Or null if
+     * none specified.
+     */
+    private String[] getInlineDisabledStyleStrings() {
+        if (inlineAllStyles != null) {
+            if (inlineDisabledStyles != null) {
+                return new String[] {inlineAllStyles, inlineDisabledStyles};
+            } else {
+                return new String[] {inlineAllStyles};
+            }
+        } else {
+            if (inlineDisabledStyles != null) {
+                return new String[]{inlineDisabledStyles};
+            } else {
+                return null;
+            }
+                    
+        }
+    }
+    
+    
     private void initStyle() {
-        unSelectedStyle = getUIManager().getComponentStyle(getUIID());
+        if (hasInlineUnselectedStyle()) {
+            unSelectedStyle = getUIManager().parseComponentStyle(getInlineStylesTheme(), getUIID(), getInlineStylesUIID(), getInlineUnselectedStyleStrings());
+        } else {
+            unSelectedStyle = getUIManager().getComponentStyle(getUIID());
+        }
         lockStyleImages(unSelectedStyle);
         if (unSelectedStyle != null) {
             unSelectedStyle.addStyleListener(this);
@@ -498,6 +797,24 @@ public class Component implements Animation, StyleListener {
     public int getX() {
         return bounds.getX();
     }
+    
+    /**
+     * Gets the x-coordinate of the outer bounds of this component.  The outer bounds are formed
+     * by the bounds outside the margin of the component.  (i.e. {@code x - leftMargin}).
+     * @return The outer X bound.
+     */
+    public int getOuterX() {
+        return getX() - getStyle().getMarginLeftNoRTL();
+    }
+    
+    /**
+     * Gets x-coordinate of the inner bounds of this component.  The inner bounds are formed by 
+     * the bounds of the padding of the component.  i.e. {@code x + leftPadding}.
+     * @return The inner x bound.
+     */
+    public int getInnerX() {
+        return getX() + getStyle().getMarginLeftNoRTL();
+    }
 
     /**
      * Returns the component y location relatively to its parent container
@@ -506,6 +823,24 @@ public class Component implements Animation, StyleListener {
      */
     public int getY() {
         return bounds.getY();
+    }
+    
+    /**
+     * Gets the Y-coordinate of the outer bounds of this component.  The outer bounds are formed
+     * by the bound of the margin of the component.  i.e. {@code y - leftMargin}.
+     * @return The outer y bound.
+     */
+    public int getOuterY() {
+        return getY() - getStyle().getMarginTop();
+    }
+    
+    /**
+     * Gets the inner y-coordinate of the inner bounds of this component. The inner bounds are formed
+     * by the bound of the padding of the component.  i.e. {@code y + leftPadding}.
+     * @return The inner y bound.
+     */
+    public int getInnerY() {
+        return getY() + getStyle().getPaddingTop();
     }
 
     /**
@@ -619,6 +954,22 @@ public class Component implements Animation, StyleListener {
     public int getWidth() {
         return bounds.getSize().getWidth();
     }
+    
+    /**
+     * Gets the outer width of this component. This is the width of the component including horizontal margins.
+     * @return The outer width.
+     */
+    public int getOuterWidth() {
+        return getWidth() + getStyle().getHorizontalMargins();
+    }
+    
+    /**
+     * Gets the inner width of this component.  This is the width of the component removing horizontal padding.
+     * @return The inner width.
+     */
+    public int getInnerWidth() {
+        return getWidth() - getStyle().getHorizontalPadding();
+    }
 
     /**
      * Returns the component height
@@ -628,6 +979,23 @@ public class Component implements Animation, StyleListener {
     public int getHeight() {
         return bounds.getSize().getHeight();
     }
+    
+    /**
+     * Gets the outer height of this component.  This is the height of the component including vertical margins.
+     * @return The outer height.
+     */
+    public int getOuterHeight() {
+        return getHeight() + getStyle().getVerticalMargins();
+    }
+    
+    /**
+     * Gets the inner height of this component.  This is the height of the component removing vertical padding.
+     * @return The inner height.
+     */
+    public int getInnerHeight() {
+        return getHeight() - getStyle().getVerticalPadding();
+    }
+    
 
     /**
      * Sets the Component x location relative to the parent container, this method
@@ -743,7 +1111,7 @@ public class Component implements Animation, StyleListener {
     public int getBaselineResizeBehavior() {
         return BRB_OTHER;
     }
-
+    
     /**
      * Sets the Component Preferred Size, there is no guarantee the Component will 
      * be sized at its Preferred Size. The final size of the component may be
@@ -767,8 +1135,71 @@ public class Component implements Animation, StyleListener {
         dim.setHeight(d.getHeight());
         sizeRequestedByUser = true;
     }
-
-
+    
+    /**
+     * Optional string the specifies the preferred size of the component. Format is {@literal <width> <height>} 
+     * where {@literal <width>} and {@literal <height>} are both scalar values.  E.g. "15px", "20.5mm", or "inherit"
+     * to indicate that it should inherit the value returned from {@link #calcPreferredSize() } for that coordinate.
+     */
+    private String preferredSizeStr;
+    
+    /**
+     * @deprecated this method shouldn't be used, use sameWidth/Height, padding, margin or override calcPeferredSize
+     * to reach similar functionality 
+     * @param value The preferred size to set in format "width height", where width and height can be a scalar
+     * value with px or mm units. Or the special value "inherit" which will just inherit the default preferred size.
+     */
+    public void setPreferredSizeStr(String value) {
+        preferredSizeStr = value;
+        setPreferredSize(null);
+    }
+    
+    /**
+     * Returns the preferred size string that can be used to specify the preferred size of the component
+     * using pixels or millimetres.  This string is applied to the preferred size just after is is initially
+     * calculated using {@link #calcPreferredSize() }. 
+     * @return 
+     * @deprecated This method is primarily for use by the GUI builder.  Use {@link #getPreferredSize() } to find
+     * the preferred size of a component.
+     */
+    public String getPreferredSizeStr() {
+        return preferredSizeStr;
+    }
+    
+    public static Dimension parsePreferredSize(String preferredSize, Dimension baseSize) {
+        String strVal = (String)preferredSize;
+        int spacePos = strVal.indexOf(" ");
+        if (spacePos == -1) {
+            return baseSize;
+        }
+        String wStr = strVal.substring(0, spacePos).trim();
+        String hStr = strVal.substring(spacePos+1).trim();
+        int unitPos=-1;
+        float pixelsPerMM = Display.getInstance().convertToPixels(1000f)/1000f;
+        try {
+            
+            
+            if ((unitPos=wStr.indexOf("mm")) != -1) {
+                baseSize.setWidth((int)Math.round(Float.parseFloat(wStr.substring(0, unitPos))*pixelsPerMM));
+            } else if ((unitPos=wStr.indexOf("px")) != -1) {
+                baseSize.setWidth(Integer.parseInt(wStr.substring(0, unitPos)));
+            } else if (!"inherit".equals(wStr)){
+                baseSize.setWidth(Integer.parseInt(wStr));
+            }
+        } catch (Throwable t){}
+        
+        try {
+            if ((unitPos=hStr.indexOf("mm")) != -1) {
+                baseSize.setHeight((int)Math.round(Float.parseFloat(hStr.substring(0, unitPos))*pixelsPerMM));
+            } else if ((unitPos=hStr.indexOf("px")) != -1) {
+                baseSize.setHeight(Integer.parseInt(hStr.substring(0, unitPos)));
+            } else if (!"inherit".equals(hStr)){
+                baseSize.setHeight(Integer.parseInt(hStr));
+            }
+        } catch (Throwable t){}
+        return baseSize;
+    }
+    
     /**
      * Returns the Component Preferred Size, there is no guarantee the Component will 
      * be sized at its Preferred Size. The final size of the component may be
@@ -871,6 +1302,38 @@ public class Component implements Animation, StyleListener {
     public int getPreferredH() {
         return getPreferredSize().getHeight();
     }
+    
+    /**
+     * Gets the preferred height including the vertical margins.
+     * @return The preferred outer height.
+     */
+    public int getOuterPreferredH() {
+        return getPreferredH() + getStyle().getVerticalMargins();
+    }
+    
+    /**
+     * Gets the preferred height removing vertical padding.
+     * @return The preferred inner height.
+     */
+    public int getInnerPreferredH() {
+        return getPreferredH() - getStyle().getVerticalPadding();
+    }
+    
+    /**
+     * Gets the preferred width including horizontal margins.
+     * @return The preferred outer width.
+     */
+    public int getOuterPreferredW() {
+        return getPreferredW() + getStyle().getHorizontalMargins();
+    }
+    
+    /**
+     * Gets the preferred width removing horizontal padding.
+     * @return 
+     */
+    public int getInnerPreferredW() {
+        return getPreferredW() - getStyle().getHorizontalPadding();
+    }
 
     /**
      * Sets the Component width, this method is exposed for the purpose of 
@@ -942,6 +1405,160 @@ public class Component implements Animation, StyleListener {
     }
     
     /**
+     * Gets inline styles that are to be applied to all states of this component.
+     * @return Inline styles applied to all states.
+     */
+    public String getInlineAllStyles() {
+        return inlineAllStyles;
+    }
+    
+    /**
+     * Gets inline styles that are to be applied to the selected state of this component.
+     * @return Inline styles applied to selected state
+     */
+    public String getInlineSelectedStyles() {
+        return this.inlineSelectedStyles;
+    }
+    
+    /**
+     * Gets inline styles that are to be applied to the unselected state of this component.
+     * @return Inline styles applied to unselected state
+     */
+    public String getInlineUnselectedStyles() {
+        return this.inlineUnselectedStyles;
+    }
+    
+    /**
+     * Gets inline styles that are to be applied to the disabled state of this component.
+     * @return Inline styles applied to disabled state
+     */
+    public String getInlineDisabledStyles() {
+        return this.inlineDisabledStyles;
+    }
+    
+    /**
+     * Gets inline styles that are to be applied to the pressed state of this component.
+     * @return Inline styles applied to pressed state
+     */
+    public String getInlinePressedStyles() {
+        return this.inlinePressedStyles;
+        
+    }
+    
+    /**
+     * Registers inline styles that should be applied to all states of the component.  
+     * @param styles 
+     * @see UIManager#parseStyle(com.codename1.ui.util.Resources, java.lang.String, java.lang.String, java.lang.String, boolean, java.lang.String...) For a description of the syntax.
+     */
+    public void setInlineAllStyles(String styles) {
+        if (styles != null && styles.trim().length() == 0) {
+            styles = null;
+        }
+        if (styles == null ? inlineAllStyles != null : !styles.equals(inlineAllStyles)) {
+            this.inlineAllStyles = styles;
+            unSelectedStyle = null;
+            selectedStyle = null;
+            disabledStyle = null;
+            pressedStyle = null;
+            allStyles = null;
+            if(!sizeRequestedByUser) {
+                preferredSize = null;
+            }
+        }
+    }
+    
+    /**
+     * Registers inline styles that should be applied to the unselected state of the component.  
+     * @param styles 
+     * @see UIManager#parseStyle(com.codename1.ui.util.Resources, java.lang.String, java.lang.String, java.lang.String, boolean, java.lang.String...) For a description of the syntax.
+     */
+    public void setInlineUnselectedStyles(String styles) {
+        if (styles != null && styles.trim().length() == 0) {
+            styles = null;
+        }
+        if (styles == null ? inlineUnselectedStyles != null : !styles.equals(inlineUnselectedStyles)) {
+            this.inlineUnselectedStyles = styles;
+
+            unSelectedStyle = null;
+            selectedStyle = null;
+            disabledStyle = null;
+            pressedStyle = null;
+            allStyles = null;
+            if(!sizeRequestedByUser) {
+                preferredSize = null;
+            }
+        }
+        
+    }
+    
+    /**
+     * Registers inline styles that should be applied to the selected state of the component.  
+     * @param styles 
+     * @see UIManager#parseStyle(com.codename1.ui.util.Resources, java.lang.String, java.lang.String, java.lang.String, boolean, java.lang.String...) For a description of the syntax.
+     */
+    public void setInlineSelectedStyles(String styles) {
+        if (styles != null && styles.trim().length() == 0) {
+            styles = null;
+        }
+        if (styles == null ? inlineSelectedStyles != null : !styles.equals(inlineSelectedStyles)) {
+            this.inlineSelectedStyles = styles;
+
+            unSelectedStyle = null;
+            selectedStyle = null;
+            disabledStyle = null;
+            pressedStyle = null;
+            allStyles = null;
+            if(!sizeRequestedByUser) {
+                preferredSize = null;
+            }
+        }
+        
+    }
+    
+    /**
+     * Registers inline styles that should be applied to the disabled state of the component.  
+     * @param styles 
+     * @see UIManager#parseStyle(com.codename1.ui.util.Resources, java.lang.String, java.lang.String, java.lang.String, boolean, java.lang.String...) For a description of the syntax.
+     */
+    public void setInlineDisabledStyles(String styles) {
+        if (styles != null && styles.trim().length() == 0) {
+            styles = null;
+        }
+        if (styles == null ? inlineDisabledStyles != null : !styles.equals(inlineDisabledStyles)) {
+            this.inlineDisabledStyles = styles;
+            unSelectedStyle = null;
+            selectedStyle = null;
+            disabledStyle = null;
+            pressedStyle = null;
+            allStyles = null;
+            if(!sizeRequestedByUser) {
+                preferredSize = null;
+            }
+        }
+    }
+    
+    /**
+     * Registers inline styles that should be applied to the pressed state of the component.  
+     * @param styles 
+     * @see UIManager#parseStyle(com.codename1.ui.util.Resources, java.lang.String, java.lang.String, java.lang.String, boolean, java.lang.String...) For a description of the syntax.
+     */
+    public void setInlinePressedStyles(String styles) {
+        if (styles != null && styles.trim().length() == 0) {
+            styles = null;
+        }
+        if (styles == null ? inlinePressedStyles != null : !styles.equals(inlinePressedStyles)) {
+            this.inlinePressedStyles = styles;
+            unSelectedStyle = null;
+            selectedStyle = null;
+            disabledStyle = null;
+            pressedStyle = null;
+            allStyles = null;
+            if(!sizeRequestedByUser) {
+                preferredSize = null;
+            }
+        }
+    }
+    /**
      * This method will remove the Component from its parent.
      */
     public void remove(){
@@ -966,6 +1583,9 @@ public class Component implements Animation, StyleListener {
      * @param parent the parent container
      */
     void setParent(Container parent) {
+        if (parent == this) {
+            throw new IllegalArgumentException("Attempt to add self as parent");
+        }
         this.parent = parent;
     }
 
@@ -1642,6 +2262,12 @@ public class Component implements Animation, StyleListener {
         g.translate(-transX, -transY);
     }
 
+    private void paintRippleEffect(Graphics g) {
+        if(isRippleEffect() && Form.rippleComponent == this && Form.rippleMotion != null) {
+            paintRippleOverlay(g, Form.rippleX, Form.rippleY, Form.rippleMotion.getValue());
+        } 
+    }
+    
     /**
      * Normally returns getStyle().getBorder() but some subclasses might use this 
      * to programmatically replace the border in runtime e.g. for a pressed border effect
@@ -1699,6 +2325,7 @@ public class Component implements Animation, StyleListener {
             Border b = getBorder();
             if (b != null && b.isBackgroundPainter()) {
                 b.paintBorderBackground(g, this);
+                paintRippleEffect(g);
                 return;
             }
         }
@@ -1706,6 +2333,7 @@ public class Component implements Animation, StyleListener {
             getStyle().getBgPainter().paint(g, bounds);
         }
         paintBackground(g);
+        paintRippleEffect(g);
     }
     
     /**
@@ -1954,15 +2582,54 @@ public class Component implements Animation, StyleListener {
     /**
      * Returns true if the given absolute coordinate is contained in the Component
      * 
+     * <p>NOTE: This will return true upon a "hit" even if the component is not
+     * visible, or if that part of the component is currently clipped by a parent
+     * component.  To check if a point is contained in the visible component bounds
+     * use {@link #visibleBoundsContains(int, int) }</p>
+     * 
      * @param x the given absolute x coordinate
      * @param y the given absolute y coordinate
      * @return true if the given absolute coordinate is contained in the 
      * Component; otherwise false
+     * 
+     * @see #visibleBoundsContains(int, int) 
      */
     public boolean contains(int x, int y) {
         int absX = getAbsoluteX() + getScrollX();
         int absY = getAbsoluteY() + getScrollY();
         return (x >= absX && x < absX + getWidth() && y >= absY && y < absY + getHeight());
+    }
+    
+    /**
+     * Returns true if the given absolute coordinate is contained inside the visible bounds
+     * of the component.  This differs from {@link #contains(int, int) } in that it will
+     * return {@literal false} if the component or any of its ancestors are not visible,
+     * or if (x, y) are contained inside the bounds of the component, but are clipped.
+     * 
+     * @param x the given absolute x coordinate
+     * @param y the given absolute y coordinate
+     * @return true if the given absolute coordinate is contained in the 
+     * Component's visible bounds; otherwise false
+     * @see #contains(int, int) 
+     */
+    public boolean visibleBoundsContains(int x, int y) {
+        boolean contains = true;
+        if (!isVisible() || !contains(x, y)) {
+            contains = false;
+        }
+        if (contains) {
+            Container parent = getParent();
+            while (parent != null) {
+                if (!parent.visibleBoundsContains(x, y)) {
+                    contains = false;
+                }
+                if (!contains) {
+                    break;
+                }
+                parent = parent.getParent();
+            }
+        }
+        return contains;
     }
 
     /**
@@ -1983,6 +2650,9 @@ public class Component implements Animation, StyleListener {
                 preferredSize = new Dimension(0, 0);
             } else {
                 preferredSize = calcPreferredSize();
+                if (preferredSizeStr != null) {
+                    Component.parsePreferredSize(preferredSizeStr, preferredSize);
+                }
             }
         }
         return preferredSize;
@@ -2340,6 +3010,65 @@ public class Component implements Animation, StyleListener {
         }
     }
 
+    /**
+     * @return the ignorePointerEvents
+     */
+    public boolean isIgnorePointerEvents() {
+        return ignorePointerEvents;
+    }
+
+    /**
+     * @param ignorePointerEvents the ignorePointerEvents to set
+     */
+    public void setIgnorePointerEvents(boolean ignorePointerEvents) {
+        this.ignorePointerEvents = ignorePointerEvents;
+    }
+
+    /**
+     * Indicates whether the component displays the material design ripple effect
+     * @return the rippleEffect
+     */
+    public boolean isRippleEffect() {
+        return rippleEffect;
+    }
+
+    /**
+     * Indicates whether the component displays the material design ripple effect
+     * @param rippleEffect the rippleEffect to set
+     */
+    public void setRippleEffect(boolean rippleEffect) {
+        this.rippleEffect = rippleEffect;
+    }
+
+    /**
+     * Gets the theme that is used by inline styles to reference images.
+     * @return the inlineStylesTheme
+     * @see #setInlineStylesTheme(com.codename1.ui.util.Resources) 
+     * @see #getInlineAllStyles() 
+     * @see #getInlineSelectedStyles() 
+     * @see #getInlinePressedStyles()
+     * @see #getInlineUnselectedStyles() 
+     * @see #getInlineDisabledStyles() 
+     */
+    public Resources getInlineStylesTheme() {
+        return inlineStylesTheme;
+    }
+
+    /**
+     * Sets the theme that is used by inline styles to reference images.  Inline styles will be
+     * disabled unless an inlineStylesTheme is registered with the component.
+     * @param inlineStylesTheme the theme that inline styles use to reference images.
+     * @see #getInlineStylesTheme() 
+     * @see #setInlineAllStyles(java.lang.String) 
+     * @see #setInlinePressedStyles(java.lang.String) 
+     * @see #setInlineSelectedStyles(java.lang.String) 
+     * @see #setInlineDisabledStyles(java.lang.String) 
+     * @see #setInlineUnselectedStyles(java.lang.String) 
+     */
+    public void setInlineStylesTheme(Resources inlineStylesTheme) {
+        this.inlineStylesTheme = inlineStylesTheme;
+    }
+
     class AnimationTransitionPainter implements Painter{
         int alpha;
         Style originalStyle;
@@ -2389,7 +3118,9 @@ public class Component implements Animation, StyleListener {
      */
     public ComponentAnimation createStyleAnimation(final String destUIID, final int duration) {
         final Style sourceStyle = getUnselectedStyle();
-        final Style destStyle = getUIManager().getComponentStyle(destUIID);
+        final Style destStyle = hasInlineUnselectedStyle() ?
+                getUIManager().parseComponentStyle(getInlineStylesTheme(), destUIID, getInlineStylesUIID(destUIID), getInlineUnselectedStyleStrings())
+                :getUIManager().getComponentStyle(destUIID);
         return createStyleAnimation(sourceStyle, destStyle, duration, destUIID);
         
     }
@@ -3313,6 +4044,25 @@ public class Component implements Animation, StyleListener {
         return tensileDragEnabled;
     }
 
+    boolean isScrollDecelerationMotionInProgress() {
+        if (draggedMotionY != null) {
+            if (draggedMotionY == decelerationMotion &&  !draggedMotionY.isFinished()) {
+                return true;
+            }
+        }
+        if (draggedMotionX != null) {
+            if (draggedMotionX == decelerationMotion && !draggedMotionX.isFinished()) {
+                return true;
+            }
+        }
+        Container parent = getParent();
+        if (parent != null) {
+            return parent.isScrollDecelerationMotionInProgress();
+        }
+        
+        return false;
+    }
+    
     void startTensile(int offset, int dest, boolean vertical) {
         Motion draggedMotion;
         if(tensileDragEnabled) {
@@ -3322,6 +4072,7 @@ public class Component implements Animation, StyleListener {
             draggedMotion = Motion.createLinearMotion(offset, dest, 0);
             draggedMotion.start();
         }
+        decelerationMotion = draggedMotion;
         
         if(vertical){
             draggedMotionY = draggedMotion;
@@ -3409,6 +4160,15 @@ public class Component implements Animation, StyleListener {
     void dragFinishedImpl(int x, int y) {
         if(dragAndDropInitialized && dragActivated) {
             Form p = getComponentForm();
+            if (p == null) {
+                //The component was removed from the form during the drag
+                dragActivated = false;
+                dragAndDropInitialized = false;
+                setVisible(true);
+                dragImage = null;
+                dropTargetComponent = null;
+                return;
+            }
             p.setDraggedComponent(null);
             Component dropTo = findDropTarget(this, x, y);
             if(dropTargetComponent != dropTo) {
@@ -3466,6 +4226,33 @@ public class Component implements Animation, StyleListener {
         pointerPressedListeners.addListener(l);
     }
 
+    /**
+     * Invoked to draw the ripple effect overlay in Android where the finger of the user causes a growing 
+     * circular overlay over time. This method is invoked after paintBackground and is invoked repeatedly until
+     * the users finger is removed, it will only be invoked if isRippleEffect returns true
+     * @param g the graphics object for the component clipped to the background
+     * @param x the x position of the touch
+     * @param y the y position of the touch
+     * @param position a value between 0 and 1000 with 0 indicating the beginning of the ripple effect and 1000 
+     * indicating the completion of it
+     */
+    public void paintRippleOverlay(Graphics g, int x, int y, int position) {
+        int a = g.getAlpha();
+        int c = g.getColor();
+        g.setAlpha(20);
+        g.setColor(0);
+        if(position == 1000) {
+            g.fillRect(getX(), getY(), getWidth(), getHeight());
+        } else {
+            float ratio = ((float)position) / 1000.0f;
+            int w = (int)(((float)getWidth()) * ratio);
+            w = Math.max(w, Display.INSTANCE.convertToPixels(4));
+            g.fillArc(x - getParent().getAbsoluteX() - w / 2, y - getParent().getAbsoluteY() - w / 2, w, w, 0, 360);
+        }
+        g.setAlpha(a);
+        g.setColor(c);
+    }
+    
     /**
      * Removes the listener from the pointer event
      *
@@ -3689,7 +4476,11 @@ public class Component implements Animation, StyleListener {
      */
     public Style getPressedStyle() {
         if (pressedStyle == null) {
-            pressedStyle = getUIManager().getComponentCustomStyle(getUIID(), "press");
+            if (hasInlinePressedStyle()) {
+                pressedStyle = getUIManager().parseComponentCustomStyle(getInlineStylesTheme(), getUIID(), getInlineStylesUIID(), "press", getInlinePressedStyleStrings());
+            } else {
+                pressedStyle = getUIManager().getComponentCustomStyle(getUIID(), "press");
+            }
             pressedStyle.addStyleListener(this);
             if(pressedStyle.getBgPainter() == null){
                 pressedStyle.setBgPainter(new BGPainter());
@@ -3738,7 +4529,11 @@ public class Component implements Animation, StyleListener {
      */
     public Style getSelectedStyle() {
         if (selectedStyle == null) {
-            selectedStyle = getUIManager().getComponentSelectedStyle(getUIID());
+            if (hasInlineSelectedStyle()) {
+                selectedStyle = getUIManager().parseComponentSelectedStyle(getInlineStylesTheme(), getUIID(), getInlineStylesUIID(), getInlineSelectedStyleStrings());
+            } else {
+                selectedStyle = getUIManager().getComponentSelectedStyle(getUIID());
+            }
             selectedStyle.addStyleListener(this);
             if (selectedStyle.getBgPainter() == null) {
                 selectedStyle.setBgPainter(new BGPainter());
@@ -3758,7 +4553,11 @@ public class Component implements Animation, StyleListener {
      */
     public Style getDisabledStyle() {
         if (disabledStyle == null) {
-            disabledStyle = getUIManager().getComponentCustomStyle(getUIID(), "dis");
+            if (hasInlineDisabledStyle()) {
+                disabledStyle = getUIManager().parseComponentCustomStyle(getInlineStylesTheme(), getUIID(), getInlineStylesUIID(), "dis", getInlineDisabledStyleStrings());
+            } else {
+                disabledStyle = getUIManager().getComponentCustomStyle(getUIID(), "dis");
+            }
             disabledStyle.addStyleListener(this);
             if (disabledStyle.getBgPainter() == null) {
                 disabledStyle.setBgPainter(new BGPainter());
@@ -3897,15 +4696,31 @@ public class Component implements Animation, StyleListener {
    
         if(merge){
             Style unSelected = getUnselectedStyle();
-            setUnselectedStyle(mergeStyle(unSelected, manager.getComponentStyle(id)));            
+            if (hasInlineUnselectedStyle()) {
+                setUnselectedStyle(mergeStyle(unSelected, manager.parseComponentStyle(getInlineStylesTheme(), id, getInlineStylesUIID(id), getInlineUnselectedStyleStrings())));
+            } else {
+                setUnselectedStyle(mergeStyle(unSelected, manager.getComponentStyle(id)));            
+            }
             if (selectedStyle != null) {
-                setSelectedStyle(mergeStyle(selectedStyle, manager.getComponentSelectedStyle(id)));
+                if (hasInlineSelectedStyle()) {
+                    setSelectedStyle(mergeStyle(selectedStyle, manager.parseComponentSelectedStyle(getInlineStylesTheme(), id, getInlineStylesUIID(id), getInlineSelectedStyleStrings())));
+                } else {
+                    setSelectedStyle(mergeStyle(selectedStyle, manager.getComponentSelectedStyle(id)));
+                }
             }
             if (disabledStyle != null) {
-                setDisabledStyle(mergeStyle(disabledStyle, manager.getComponentCustomStyle(id, "dis")));
+                if (hasInlineDisabledStyle()) {
+                    setDisabledStyle(mergeStyle(disabledStyle, manager.parseComponentCustomStyle(getInlineStylesTheme(), id, getInlineStylesUIID(id), "dis", getInlineDisabledStyleStrings())));
+                } else {
+                    setDisabledStyle(mergeStyle(disabledStyle, manager.getComponentCustomStyle(id, "dis")));
+                }
             }
             if(pressedStyle != null) {
-                setPressedStyle(mergeStyle(pressedStyle, manager.getComponentCustomStyle(id, "press")));
+                if (hasInlinePressedStyle()) {
+                    setPressedStyle(mergeStyle(pressedStyle, manager.parseComponentCustomStyle(getInlineStylesTheme(), id, getInlineStylesUIID(id), "press", getInlinePressedStyleStrings())));
+                } else {
+                    setPressedStyle(mergeStyle(pressedStyle, manager.getComponentCustomStyle(id, "press")));
+                }
             }
         }else{
             unSelectedStyle = null;
@@ -5323,6 +6138,10 @@ public class Component implements Animation, StyleListener {
                 Image img = s.getBgImage();
                 if(img != null && img.requiresDrawImage()) {
                     // damn no native painting...
+                    int oldX = x;
+                    int oldY = y;
+                    x = rect.getX();
+                    y = rect.getY();
                     int iW = img.getWidth();
                     int iH = img.getHeight();
                     switch (s.getBackgroundType()) {
@@ -5454,6 +6273,8 @@ public class Component implements Animation, StyleListener {
                             g.drawImage(img, x + width - iW, y + (height - iH));
                             return;
                     }
+                    x = oldX;
+                    y = oldY;
                 } 
                 
                 impl.paintComponentBackground(g.getGraphics(), x, y, width, height, s);

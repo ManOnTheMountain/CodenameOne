@@ -423,6 +423,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             int pb = stl.getPaddingBottom();
             int pl = stl.getPaddingLeft(rtl);
             int pr = stl.getPaddingRight(rtl);
+            /*
             if(cmp.isSingleLineTextArea()) {
                 switch(cmp.getVerticalAlignment()) {
                     case TextArea.CENTER:
@@ -437,6 +438,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                         break;
                 }
             }
+            */
             
             int maxH = Display.getInstance().getDisplayHeight() - nativeInstance.getVKBHeight();
             
@@ -732,6 +734,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                     int pb = stl.getPaddingBottom();
                     int pl = stl.getPaddingLeft(rtl);
                     int pr = stl.getPaddingRight(rtl);
+                    /*
                     if(currentEditing != null && currentEditing.isSingleLineTextArea()) {
                         switch(currentEditing.getVerticalAlignment()) {
                             case TextArea.CENTER:
@@ -746,6 +749,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                                 break;
                         }
                     }
+                    */
                     String hint = null;
                     if(currentEditing != null && currentEditing.getUIManager().isThemeConstant("nativeHintBool", true) && currentEditing.getHint() != null) {
                         hint = currentEditing.getHint();
@@ -772,7 +776,12 @@ public class IOSImplementation extends CodenameOneImplementation {
                                 pt,
                                 pb,
                                 pl,
-                                pr, hint, showToolbar, Boolean.TRUE.equals(cmp.getClientProperty("blockCopyPaste")));
+                                pr, 
+                                hint, 
+                                showToolbar, 
+                                Boolean.TRUE.equals(cmp.getClientProperty("blockCopyPaste")),
+                                currentEditing.getStyle().getAlignment(),
+                                currentEditing.getVerticalAlignment());
                     }
                 }
             });
@@ -796,7 +805,10 @@ public class IOSImplementation extends CodenameOneImplementation {
             });
             
             if(cmp instanceof TextArea && !((TextArea)cmp).isSingleLineTextArea()) {
-                cmp.getComponentForm().revalidate();
+                Form form = cmp.getComponentForm();
+                if (form != null) {
+                    form.revalidate();
+                }
             }
             if(editNext) {
                 editNext = false;
@@ -1984,13 +1996,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         );
     }
 
-    
-    
     @Override
-    public boolean transformEqualsImpl(Transform t1, Transform t2) {
+    public boolean transformNativeEqualsImpl(Object t1, Object t2) {
         if ( t1 != null ){
-            Matrix m1 = (Matrix)t1.getNativeTransform();
-            Matrix m2 = (Matrix)t2.getNativeTransform();
+            Matrix m1 = (Matrix)t1;
+            Matrix m2 = (Matrix)t2;
             return m1.equals(m2);
         } else {
             return t2 == null;
@@ -3036,6 +3046,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         private boolean nativePlayer;
         private long moviePlayerPeer;
         private boolean fullScreen;
+        private boolean embedNativeControls=true;
+        
         
         public IOSMedia(String uri, boolean isVideo, Runnable onCompletion) {
             this.uri = uri;
@@ -3064,7 +3076,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         @Override
         public void play() {
             if(isVideo) {
-                if(nativePlayer) {
+                if(component == null && nativePlayer) {
+                    // Mass source of confusion.  If getVideoComponent() has been called, then
+                    // we can't use the native player.
                     if(uri != null) {
                         moviePlayerPeer = nativeInstance.createNativeVideoComponent(uri, onCompletionCallbackId);
                     } else {
@@ -3191,6 +3205,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             if (component == null) {
                 if(uri != null) {
                     moviePlayerPeer = nativeInstance.createVideoComponent(uri, onCompletionCallbackId);
+                    nativeInstance.setNativeVideoControlsEmbedded(moviePlayerPeer, embedNativeControls);
                     component = PeerComponent.create(new long[] { nativeInstance.getVideoViewPeer(moviePlayerPeer) });
                 } else {
                     try {
@@ -3260,6 +3275,12 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             if(key.equals(Media.VARIABLE_BACKGROUND_TITLE)) {
                 nativeInstance.setMediaBgTitle((String)value);
+            }
+            if(Media.VARIABLE_NATIVE_CONTRLOLS_EMBEDDED.equals(key) && value instanceof Boolean) {
+                embedNativeControls = (Boolean)value;
+                if (moviePlayerPeer != 0) {
+                    nativeInstance.setNativeVideoControlsEmbedded(moviePlayerPeer, (Boolean)value);
+                }
             }
         }
 
@@ -5733,6 +5754,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         protected void initComponent() {
+            super.initComponent();
             if(nativePeer != null && nativePeer[0] != 0) {
                 nativeInstance.peerInitialized(nativePeer[0], getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
             }
@@ -5743,6 +5765,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 setPeerImage(generatePeerImage());
                 nativeInstance.peerDeinitialized(nativePeer[0]);
             }
+            super.deinitialize();
         }
         
         protected void setLightweightMode(boolean l) {
@@ -6920,6 +6943,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                     super.setLocale(locale, language);
                     Locale l = new Locale(language, locale);
                     Locale.setDefault(l);
+                    nativeInstance.setLocale(language+"_"+locale);
                 }
             };
         }
@@ -7622,8 +7646,10 @@ public class IOSImplementation extends CodenameOneImplementation {
                 c.set(java.util.Calendar.HOUR_OF_DAY, ((Integer)currentValue).intValue() / 60);
                 c.set(java.util.Calendar.MINUTE, ((Integer)currentValue).intValue() % 60);
                 time = c.getTime().getTime();
-            } else {
+            } else if (currentValue != null) {
                 time = ((java.util.Date)currentValue).getTime();
+            } else {
+                time = new java.util.Date().getTime();
             }
             nativeInstance.openDatePicker(type, time, x, y, w, h, preferredWidth, preferredHeight);
         }

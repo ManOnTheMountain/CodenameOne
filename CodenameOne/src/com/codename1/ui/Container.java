@@ -1157,6 +1157,7 @@ public class Container extends Component implements Iterable<Component>{
             
             // for complex hierarchies 
             if(getParent() != null) {
+                getParent().shouldLayout = true;
                 getParent().layoutContainer();
             } else {
                 layoutContainer();
@@ -1856,6 +1857,11 @@ public class Container extends Component implements Iterable<Component>{
         for (int i = count - 1; i >= startIter; i--) {
             Component cmp = getComponentAt(i);
             if (cmp.contains(x, y)) {
+                // this is a workaround for the issue mentioned here: https://stackoverflow.com/questions/44112337/action-listening-for-container-itself-and-sub-buttons/44125364
+                // the block lead has some weird behaviors with overlap hierarchies, not sure if this is the best solution
+                if(component != null && component.isBlockLead()) {
+                    return component;
+                }
                 component = cmp;
                 if (!overlaps && component.isFocusable()) {
                     // special case for lead blocking
@@ -1885,8 +1891,7 @@ public class Container extends Component implements Iterable<Component>{
             return this;
         }
         return null;
-    }
-
+    }    
     /**
      * Recursively searches the container hierarchy for a drop target
      * 
@@ -2901,6 +2906,12 @@ public class Container extends Component implements Iterable<Component>{
             thisContainer.replace(current, next, growSpeed > 0 || layoutAnimationSpeed > 0);
             //release the events blocking
             t.cleanup();
+            if (current != null) {
+                current.setLightweightMode(false);
+            }
+            if (next != null) {
+                next.setLightweightMode(false);
+            }
             if(thisContainer.cmpTransitions != null && thisContainer.cmpTransitions.size() == 0 && growSpeed > -1){
                 if(growSpeed > 0) {
                     current.growShrink(growSpeed);
@@ -3017,4 +3028,3 @@ public class Container extends Component implements Iterable<Component>{
         
     }
 }
-

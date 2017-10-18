@@ -622,19 +622,47 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
                         if(v.getParent() == null) {
                             v.setLayoutParams(lp);
                             addView(v);
+                            ArrayList<View> toRemove = new ArrayList<View>();
+                            ViewGroup parentGroup = (ViewGroup)v.getParent();
+                            int childCount = parentGroup.getChildCount();
+                            for (int i=0; i<childCount; i++) {
+                                View child = parentGroup.getChildAt(i);
+                                if (child == v) {
+                                    continue;
+                                }
+                                AndroidImplementation.AndroidPeer peer = AndroidImplementation.activePeers.get(child);
+
+                                if (peer != null) {
+                                    if (!peer._initialized()) {
+                                        toRemove.add(child);
+                                    }
+                                }
+                            }
+                            for (View child : toRemove) {
+                                removeView(child);
+                                synchronized(AndroidImplementation.activePeers) {
+                                    AndroidImplementation.activePeers.remove(child);
+                                }
+                            }
+
                         }
                     }
                 });
+
             }
             pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {
                 @Override
                 public void execute(AndroidGraphics underlying) {
-                    drawChild(underlying.canvas, v, getDrawingTime());
+                    if (v.getParent() != null) {
+                        drawChild(underlying.canvas, v, getDrawingTime());
+                    }
                 }
+
                 public String toString() {
                     return "drawView(PeerComponent)";
                 }
             });
+
         }
 
         @Override

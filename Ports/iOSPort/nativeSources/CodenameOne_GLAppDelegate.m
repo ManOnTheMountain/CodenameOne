@@ -43,16 +43,58 @@ extern UIView *editingComponent;
 #define INCLUDE_CN1_PUSH
 
 #ifdef INCLUDE_GOOGLE_CONNECT
+#ifndef GOOGLE_SIGNIN
 #ifdef GOOGLE_CONNECT_PODS
 #import <GooglePlus/GooglePlus.h>
 #else
 #import "GooglePlus.h"
 #endif
+#else
+#import <GoogleSignIn/GoogleSignIn.h>
+#endif
+
 #endif
 
 #ifdef INCLUDE_FACEBOOK_CONNECT
+#ifdef USE_FACEBOOK_CONNECT_PODS
+#import <FBSDKCoreKit/FBSDKCoreKit.h>
+#else
 #import "FBSDKCoreKit.h"
 #endif
+#endif
+
+#import "java_lang_NullPointerException.h"
+#import "java_lang_RuntimeException.h"
+
+// A signal handler to handle bad accesses.  This will throw NPEs that we can catch
+// rather than crashing the app.
+// See http://www.cocoawithlove.com/2010/05/handling-unhandled-exceptions-and.html
+//
+// NOTE: This handler WILL NOT WORK while using the debugger
+static void SignalHandler(int sig)
+{
+    if (sig == 11) {
+        // We received an EXEC_BAD_ACCESS.  This generally happens if we try to use an object
+        // that is null, so let's convert it into a null pointer exception.
+        throwException(getThreadLocalData(),  __NEW_INSTANCE_java_lang_NullPointerException(getThreadLocalData()));
+    } else {
+        // We received one of the other kinds of signals.  So let's raise it as a RuntimeException
+        throwException(getThreadLocalData(), __NEW_INSTANCE_java_lang_RuntimeException(getThreadLocalData()));
+    }
+    // Log something just in case the exception handling is foobar'd
+    NSLog(@"We had a signal %d", sig);
+    //signal(sig, SIG_DFL);
+}
+
+static void installSignalHandlers() {
+    signal(SIGABRT, SignalHandler);
+    signal(SIGILL, SignalHandler);
+    signal(SIGSEGV, SignalHandler);
+    signal(SIGFPE, SignalHandler);
+    signal(SIGBUS, SignalHandler);
+    signal(SIGPIPE, SignalHandler);
+
+}
 
 
 @implementation CodenameOne_GLAppDelegate
@@ -67,6 +109,10 @@ extern UIView *editingComponent;
     //beforeDidFinishLaunchingWithOptionsMarkerEntry
     
     // Override point for customization after application launch.
+    
+    // Install signal handlers so that rather than the app crashing upon a BAD_ACCESS, the 
+    // app will throw an NPE.
+    installSignalHandlers();
     self.window.rootViewController = self.viewController;
     NSURL *url = (NSURL *)[launchOptions valueForKey:UIApplicationLaunchOptionsURLKey];
     if(url != nil) {
@@ -83,7 +129,7 @@ extern UIView *editingComponent;
     com_codename1_impl_ios_IOSImplementation_callback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     
     if (launchOptions[UIApplicationLaunchOptionsLocalNotificationKey]) {
-        NSLog(@"Background notification received");
+        CN1Log(@"Background notification received");
         UILocalNotification *notification = launchOptions[UIApplicationLaunchOptionsLocalNotificationKey];
         com_codename1_impl_ios_IOSImplementation_localNotificationReceived___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [notification.userInfo valueForKey:@"__ios_id__"]));
         application.applicationIconBadgeNumber = 0;
@@ -115,7 +161,7 @@ extern UIView *editingComponent;
         //afterDidFinishLaunchingWithOptionsMarkerEntry
         return YES;
     }
-    NSLog(@"Received notification on start: %@", userInfo);
+    CN1Log(@"Received notification on start: %@", userInfo);
     BOOL pushIncludedBody = NO;
     if( [[userInfo valueForKey:@"aps"] valueForKey:@"alert"] != NULL)
     {
@@ -128,7 +174,7 @@ extern UIView *editingComponent;
                 alertValue = [NSString stringWithFormat:@"%@;%@", [alertValueD valueForKey:@"title"], [alertValueD valueForKey:@"body"]];
                 com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"4"));
             } else {
-                NSLog(@"Received push type 4 but missing either title or body");
+                CN1Log(@"Received push type 4 but missing either title or body");
             }
             
         } else {
@@ -208,7 +254,7 @@ extern UIView *editingComponent;
     JAVA_OBJECT str2 = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG sourceApplication);
     
 #ifdef INCLUDE_GOOGLE_CONNECT
-    
+#ifndef GOOGLE_SIGNIN
     // Handle Google Plus Login
     BOOL res = [GPPURLHandler handleURL:url
            sourceApplication:sourceApplication
@@ -216,7 +262,13 @@ extern UIView *editingComponent;
     if (res) {
         return res;
     }
-    
+#else
+    BOOL res = [[GIDSignIn sharedInstance] handleURL:url sourceApplication:sourceApplication
+                                           annotation:annotation];
+    if (res) {
+        return res;
+    }
+#endif
 #endif
 #ifdef INCLUDE_FACEBOOK_CONNECT
     BOOL fbRes = [[FBSDKApplicationDelegate sharedInstance] application:application
@@ -321,13 +373,13 @@ CN1BackgroundFetchBlockType cn1UIBackgroundFetchResultCompletionHandler = 0;
 }
  
 - (void)application:(UIApplication*)application didFailToRegisterForRemoteNotificationsWithError:(NSError*)error {
-	NSLog(@"Failed to get token, error: %@", error);
+	CN1Log(@"Failed to get token, error: %@", error);
     JAVA_OBJECT str = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]);
     com_codename1_impl_ios_IOSImplementation_pushRegistrationError___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG str);
 }
 
 - (void)application:(UIApplication*)application didReceiveRemoteNotification:(NSDictionary*)userInfo {
-    NSLog(@"Received notification while running: %@", userInfo);
+    CN1Log(@"Received notification while running: %@", userInfo);
     
     NSDictionary *apsInfo = [userInfo objectForKey:@"aps"];
     if(apsInfo == nil) {
@@ -346,7 +398,7 @@ CN1BackgroundFetchBlockType cn1UIBackgroundFetchResultCompletionHandler = 0;
                 alertValue = [NSString stringWithFormat:@"%@;%@", [alertValueD valueForKey:@"title"], [alertValueD valueForKey:@"body"]];
                 com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"4"));
             } else {
-                NSLog(@"Received push type 4 but missing either title or body");
+                CN1Log(@"Received push type 4 but missing either title or body");
             }
             
         } else {
@@ -394,7 +446,7 @@ extern void repaintUI();
 }
 
 - (void)application:(UIApplication*)application didReceiveLocalNotification:(UILocalNotification*)notification {
-    NSLog(@"Received local notification while running: %@", notification);
+    CN1Log(@"Received local notification while running: %@", notification);
     if( [notification.userInfo valueForKey:@"__ios_id__"] != NULL)
     {
         NSString* alertValue = [notification.userInfo valueForKey:@"__ios_id__"];
